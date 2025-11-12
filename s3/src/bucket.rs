@@ -100,6 +100,8 @@ use http::header::HeaderName;
 #[cfg(any(feature = "with-tokio", feature = "with-async-std"))]
 use sysinfo::{MemoryRefreshKind, System};
 
+use awscreds::error::CredentialsError;
+
 pub const CHUNK_SIZE: usize = 8_388_608; // 8 Mebibytes, min is 5 (5_242_880);
 
 const DEFAULT_REQUEST_TIMEOUT: Option<Duration> = Some(Duration::from_secs(60));
@@ -2950,6 +2952,40 @@ impl Bucket {
             Ok(credentials) => Ok(credentials.clone()),
             Err(_) => Err(S3Error::CredentialsReadLock),
         }
+    }
+
+    #[maybe_async::async_impl]
+    pub async fn refresh_credentials<F>(&self, credentials: F) -> Result<(), CredentialsError>
+    where
+        F: FnOnce() -> Result<Credentials, CredentialsError>,
+    {
+        let creds = self.credentials.read().await;
+        if creds.is_expired() {
+            drop(creds);
+            let mut creds = self.credentials.write().await;
+            if creds.is_expired() {
+                *creds = credentials()?;
+            }
+        }
+        Ok(())
+    }
+
+    #[maybe_async::sync_impl]
+    pub fn refresh_credentials<F>(&self, credentials: F) -> Result<(), CredentialsError>
+    where
+        F: FnOnce() -> Result<Credentials, CredentialsError>,
+    {
+        if let Ok(creds) = self.credentials.read()
+            && creds.is_expired()
+        {
+            drop(creds);
+            if let Ok(mut creds) = self.credentials.write()
+                && creds.is_expired()
+            {
+                *creds = credentials()?;
+            }
+        }
+        Ok(())
     }
 
     /// Change the credentials used by the Bucket.

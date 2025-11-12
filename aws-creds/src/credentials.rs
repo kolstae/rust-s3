@@ -189,12 +189,10 @@ fn http_get(url: &str) -> attohttpc::Result<attohttpc::Response> {
 
 impl Credentials {
     pub fn refresh(&mut self) -> Result<(), CredentialsError> {
-        if let Some(expiration) = self.expiration {
-            if expiration.0 <= OffsetDateTime::now_utc() {
-                debug!("Refreshing credentials!");
-                let refreshed = Credentials::default()?;
-                *self = refreshed
-            }
+        if self.is_expired() {
+            debug!("Refreshing credentials!");
+            let refreshed = Credentials::default()?;
+            *self = refreshed
         }
         Ok(())
     }
@@ -464,6 +462,14 @@ impl Credentials {
             format!("{}/.aws/credentials", home_dir.display())
         };
         Credentials::from_credentials_file(&profile, section)
+    }
+
+    pub fn is_expired(&self) -> bool {
+        if let Some(expiration) = self.expiration {
+            expiration.0 <= OffsetDateTime::now_utc()
+        } else {
+            false
+        }
     }
 }
 
