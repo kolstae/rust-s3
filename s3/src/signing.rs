@@ -186,7 +186,7 @@ pub fn string_to_sign(
         "AWS4-HMAC-SHA256\n{timestamp}\n{scope}\n{hash}",
         timestamp = datetime.format(LONG_DATETIME)?,
         scope = scope_string(datetime, region)?,
-        hash = hex::encode(hasher.finalize().as_slice())
+        hash = hex::encode(hasher.finalize())
     );
     Ok(string_to)
 }

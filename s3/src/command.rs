@@ -298,23 +298,23 @@ impl<'a> Command<'a> {
             Command::PutObject { content, .. } => {
                 let mut sha = Sha256::default();
                 sha.update(content);
-                hex::encode(sha.finalize().as_slice())
+                hex::encode(sha.finalize())
             }
             Command::PutObjectTagging { tags } => {
                 let mut sha = Sha256::default();
                 sha.update(tags.as_bytes());
-                hex::encode(sha.finalize().as_slice())
+                hex::encode(sha.finalize())
             }
             Command::CompleteMultipartUpload { data, .. } => {
                 let mut sha = Sha256::default();
                 sha.update(data.to_string().as_bytes());
-                hex::encode(sha.finalize().as_slice())
+                hex::encode(sha.finalize())
             }
             Command::CreateBucket { config } => {
                 if let Some(payload) = config.location_constraint_payload() {
                     let mut sha = Sha256::default();
                     sha.update(payload.as_bytes());
-                    hex::encode(sha.finalize().as_slice())
+                    hex::encode(sha.finalize())
                 } else {
                     EMPTY_PAYLOAD_SHA.into()
                 }
@@ -322,12 +322,12 @@ impl<'a> Command<'a> {
             Command::PutBucketLifecycle { configuration } => {
                 let mut sha = Sha256::default();
                 sha.update(quick_xml::se::to_string(configuration)?.as_bytes());
-                hex::encode(sha.finalize().as_slice())
+                hex::encode(sha.finalize())
             }
             Command::PutBucketCors { configuration, .. } => {
                 let mut sha = Sha256::default();
                 sha.update(configuration.to_string().as_bytes());
-                hex::encode(sha.finalize().as_slice())
+                hex::encode(sha.finalize())
             }
             Command::HeadObject => EMPTY_PAYLOAD_SHA.into(),
             Command::DeleteObject => EMPTY_PAYLOAD_SHA.into(),
