@@ -1666,7 +1666,7 @@ impl Bucket {
         }
 
         let msg = self
-            .initiate_multipart_upload(s3_path, content_type)
+            .initiate_multipart_upload_with_metadata(s3_path, content_type, custom_headers)
             .await?;
         let path = msg.key;
         let upload_id = &msg.upload_id;
@@ -1857,12 +1857,16 @@ impl Bucket {
 
     /// Initiate multipart upload to s3.
     #[maybe_async::async_impl]
-    pub async fn initiate_multipart_upload(
+    pub async fn initiate_multipart_upload_with_metadata(
         &self,
         s3_path: &str,
         content_type: &str,
+        custom_headers: Option<HeaderMap>,
     ) -> Result<InitiateMultipartUploadResponse, S3Error> {
-        let command = Command::InitiateMultipartUpload { content_type };
+        let command = Command::InitiateMultipartUpload {
+            content_type,
+            custom_headers,
+        };
         let request = RequestImpl::new(self, s3_path, command).await?;
         let response_data = request.response_data(false).await?;
         if response_data.status_code() >= 300 {
@@ -1874,13 +1878,27 @@ impl Bucket {
         Ok(msg)
     }
 
+    /// Initiate multipart upload to s3.
+    #[maybe_async::async_impl]
+    pub async fn initiate_multipart_upload(
+        &self,
+        s3_path: &str,
+        content_type: &str,
+    ) -> Result<InitiateMultipartUploadResponse, S3Error> {
+        self.initiate_multipart_upload_with_metadata(s3_path, content_type, None)
+            .await
+    }
+
     #[maybe_async::sync_impl]
     pub fn initiate_multipart_upload(
         &self,
         s3_path: &str,
         content_type: &str,
     ) -> Result<InitiateMultipartUploadResponse, S3Error> {
-        let command = Command::InitiateMultipartUpload { content_type };
+        let command = Command::InitiateMultipartUpload {
+            content_type,
+            custom_headers: None,
+        };
         let request = RequestImpl::new(self, s3_path, command)?;
         let response_data = request.response_data(false)?;
         if response_data.status_code() >= 300 {
@@ -2318,8 +2336,13 @@ impl Bucket {
         content: &[u8],
         custom_headers: Option<HeaderMap>,
     ) -> Result<ResponseData, S3Error> {
-        self.put_object_with_content_type_and_headers(path, content, "application/octet-stream", custom_headers)
-            .await
+        self.put_object_with_content_type_and_headers(
+            path,
+            content,
+            "application/octet-stream",
+            custom_headers,
+        )
+        .await
     }
 
     /// Put into an S3 bucket.
@@ -3053,7 +3076,7 @@ mod test {
     use crate::serde_types::CorsConfiguration;
     use crate::serde_types::CorsRule;
     use crate::{Bucket, PostPolicy};
-    use http::header::{HeaderMap, HeaderName, HeaderValue, CACHE_CONTROL};
+    use http::header::{CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue};
     use std::env;
 
     fn init() {
@@ -3241,7 +3264,10 @@ mod test {
 
         let mut custom_headers = HeaderMap::new();
         custom_headers.insert(CACHE_CONTROL, HeaderValue::from_static(header_value));
-        custom_headers.insert(HeaderName::from_static("test-key"), "value".parse().unwrap());
+        custom_headers.insert(
+            HeaderName::from_static("test-key"),
+            "value".parse().unwrap(),
+        );
 
         let response_data = bucket
             .put_object_with_headers(s3_path, &test, Some(custom_headers.clone()))
@@ -3269,7 +3295,10 @@ mod test {
         let (head_object_result, code) = bucket.head_object(s3_path).await.unwrap();
         // println!("{:?}", head_object_result);
         assert_eq!(code, 200);
-        assert_eq!(head_object_result.cache_control, Some(header_value.to_string()));
+        assert_eq!(
+            head_object_result.cache_control,
+            Some(header_value.to_string())
+        );
 
         let response_data = bucket.delete_object(s3_path).await.unwrap();
         assert_eq!(response_data.status_code(), 204);
